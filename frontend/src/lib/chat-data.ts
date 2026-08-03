@@ -25,5 +25,5 @@ export const botContact: Contact = {
   online: true,
 };
 
-// API base URL — backend running on port 8000
-export const API_BASE = "http://localhost:8000/api/v1";
+// API base URL — uses VITE_API_BASE env var in production, falls back to localhost for dev
+export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api/v1";

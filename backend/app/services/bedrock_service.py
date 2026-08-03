@@ -7,12 +7,14 @@ class BedrockService:
     """Thin wrapper over AWS Bedrock Converse API."""
 
     def __init__(self):
-        self.client = boto3.client(
-            "bedrock-runtime",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
+        # Use explicit credentials if provided (local dev), otherwise fall back
+        # to IAM role / instance profile (ECS Fargate, EC2, etc.)
+        client_kwargs = {"region_name": settings.aws_region}
+        if settings.aws_access_key_id and settings.aws_secret_access_key:
+            client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+            client_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+
+        self.client = boto3.client("bedrock-runtime", **client_kwargs)
         self.model_id = settings.bedrock_model_id
 
     def converse(self, messages: list[dict], system_prompt: str) -> dict:

@@ -1,0 +1,394 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Vaidya AI - Pre-Consult Medical Intake POC (EC2 + Elastic IP + S3/CloudFront)"
+
+Parameters:
+  AppName:
+    Type: String
+    Default: vaidya-ai
+    Description: Application name used for resource naming
+
+  AwsRegion:
+    Type: String
+    Default: ap-south-1
+    Description: AWS region for Bedrock and deployment
+
+  BedrockModelId:
+    Type: String
+    Default: "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    Description: Bedrock model ID for the AI
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: EC2 instance type (t3.micro = free tier eligible)
+
+  KeyPairName:
+    Type: String
+    Description: Name of an existing EC2 Key Pair for SSH access
+    Default: ""
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Latest Amazon Linux 2023 AMI
+
+Resources:
+  # =====================
+  # VPC & Networking
+  # =====================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-vpc"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-igw"
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-rt"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # =====================
+  # Security Group
+  # =====================
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP (8000) and SSH access
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+          Description: Backend API
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH access
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-ec2-sg"
+
+  # =====================
+  # IAM Role for EC2
+  # =====================
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-ec2-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: "*"
+        - PolicyName: ECRAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${AppName}-ec2-profile"
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # =====================
+  # ECR Repository
+  # =====================
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AppName}-backend"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+
+  # =====================
+  # EC2 Instance
+  # =====================
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: AttachGateway
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-server"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+
+          # Install Docker
+          yum update -y
+          yum install -y docker
+          systemctl enable docker
+          systemctl start docker
+          usermod -aG docker ec2-user
+
+          # Login to ECR
+          aws ecr get-login-password --region ${AWS::Region} | docker login --username AWS --password-stdin ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+
+          # Pull and run the backend container
+          IMAGE="${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}:latest"
+          docker pull $IMAGE || echo "No image yet — will be deployed via CI/CD"
+
+          # Run container (will fail gracefully if no image yet)
+          docker run -d \
+            --name vaidya-backend \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e APP_ENV=production \
+            -e AWS_REGION=${AwsRegion} \
+            -e BEDROCK_MODEL_ID=${BedrockModelId} \
+            -e CORS_ORIGINS="*" \
+            $IMAGE || echo "Container will start after first CI/CD deploy"
+
+          # Create a deploy helper script
+          cat > /home/ec2-user/deploy.sh << 'EOF'
+          #!/bin/bash
+          REGION="${AWS::Region}"
+          ACCOUNT="${AWS::AccountId}"
+          REPO="${ECRRepository}"
+          IMAGE="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO:latest"
+
+          echo "Pulling latest image..."
+          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$REGION.amazonaws.com
+          docker pull $IMAGE
+
+          echo "Restarting container..."
+          docker stop vaidya-backend 2>/dev/null || true
+          docker rm vaidya-backend 2>/dev/null || true
+          docker run -d \
+            --name vaidya-backend \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e APP_ENV=production \
+            -e AWS_REGION=$REGION \
+            -e BEDROCK_MODEL_ID="${BedrockModelId}" \
+            -e CORS_ORIGINS="*" \
+            $IMAGE
+
+          echo "Done! Backend running at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8000"
+          EOF
+          chmod +x /home/ec2-user/deploy.sh
+          chown ec2-user:ec2-user /home/ec2-user/deploy.sh
+
+  # =====================
+  # Elastic IP (Stable public IP)
+  # =====================
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-eip"
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref EC2Instance
+      AllocationId: !GetAtt ElasticIP.AllocationId
+
+  # =====================
+  # CloudWatch Log Group
+  # =====================
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ec2/${AppName}"
+      RetentionInDays: 7
+
+  # =====================
+  # S3 Bucket for Frontend
+  # =====================
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AppName}-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendCloudFront}"
+
+  # =====================
+  # CloudFront for Frontend
+  # =====================
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AppName}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendCloudFront:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          ForwardedValues:
+            QueryString: false
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        PriceClass: PriceClass_200
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+
+Outputs:
+  BackendURL:
+    Description: Backend API URL (Elastic IP - never changes)
+    Value: !Sub "http://${ElasticIP}:8000"
+
+  BackendIP:
+    Description: Backend Elastic IP address
+    Value: !Ref ElasticIP
+
+  FrontendURL:
+    Description: Frontend URL (CloudFront)
+    Value: !Sub "https://${FrontendCloudFront.DomainName}"
+
+  ECRRepositoryUri:
+    Description: ECR Repository URI for Docker push
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}"
+
+  FrontendBucketName:
+    Description: S3 bucket name for frontend deployment
+    Value: !Ref FrontendBucket
+
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID (for cache invalidation)
+    Value: !Ref FrontendCloudFront
+
+  EC2InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+
+  SSHCommand:
+    Description: SSH command to access the server
+    Value: !Sub "ssh -i <your-key.pem> ec2-user@${ElasticIP}"

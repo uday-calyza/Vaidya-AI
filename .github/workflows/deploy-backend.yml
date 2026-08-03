@@ -1,0 +1,93 @@
+# =============================================================================
+# CI/CD: Build Backend Docker Image → Push to ECR → Deploy to EC2
+# =============================================================================
+# Triggers on push to main when backend/ files change.
+#
+# Required GitHub Secrets:
+#   AWS_ACCESS_KEY_ID       - IAM user access key (with ECR + EC2 permissions)
+#   AWS_SECRET_ACCESS_KEY   - IAM user secret key
+#   EC2_HOST                - Elastic IP of your EC2 instance
+#   EC2_SSH_KEY             - Private key (.pem content) for SSH access
+# =============================================================================
+
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: vaidya-ai-backend
+  BEDROCK_MODEL_ID: "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_ENV
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login to ECR
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
+
+            # Pull latest image
+            docker pull ${{ env.IMAGE }}
+
+            # Stop and remove old container
+            docker stop vaidya-backend 2>/dev/null || true
+            docker rm vaidya-backend 2>/dev/null || true
+
+            # Run new container
+            docker run -d \
+              --name vaidya-backend \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e APP_ENV=production \
+              -e AWS_REGION=${{ env.AWS_REGION }} \
+              -e BEDROCK_MODEL_ID=${{ env.BEDROCK_MODEL_ID }} \
+              -e CORS_ORIGINS="*" \
+              ${{ env.IMAGE }}
+
+            # Verify health
+            sleep 5
+            curl -f http://localhost:8000/health || echo "Health check failed — container may still be starting"
+
+            # Clean up old images
+            docker image prune -f

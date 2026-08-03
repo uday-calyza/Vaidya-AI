@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
 
+    # CORS — comma-separated list of allowed origins
+    # In production, set to your CloudFront URL e.g. "https://d1234abcdef.cloudfront.net"
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:8080"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
