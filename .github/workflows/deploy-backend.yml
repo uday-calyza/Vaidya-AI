@@ -63,12 +63,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 5m
           script: |
             # Login to ECR
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
+            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 863355752069.dkr.ecr.ap-south-1.amazonaws.com
 
             # Pull latest image
-            docker pull ${{ env.IMAGE }}
+            docker pull 863355752069.dkr.ecr.ap-south-1.amazonaws.com/vaidya-ai-backend:latest
 
             # Stop and remove old container
             docker stop vaidya-backend 2>/dev/null || true
@@ -80,10 +81,10 @@ jobs:
               --restart unless-stopped \
               -p 8000:8000 \
               -e APP_ENV=production \
-              -e AWS_REGION=${{ env.AWS_REGION }} \
-              -e BEDROCK_MODEL_ID=${{ env.BEDROCK_MODEL_ID }} \
+              -e AWS_REGION=ap-south-1 \
+              -e BEDROCK_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0 \
               -e CORS_ORIGINS="*" \
-              ${{ env.IMAGE }}
+              863355752069.dkr.ecr.ap-south-1.amazonaws.com/vaidya-ai-backend:latest
 
             # Verify health
             sleep 5
