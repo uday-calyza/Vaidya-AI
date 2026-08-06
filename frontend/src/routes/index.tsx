@@ -4,15 +4,6 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import { API_BASE, botContact, nowTime, type Message } from "@/lib/chat-data";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Pre-Consult AI — Medical Intake" },
-      {
-        name: "description",
-        content: "AI-powered pre-consultation medical intake assistant.",
-      },
-    ],
-  }),
   component: Index,
 });
 
