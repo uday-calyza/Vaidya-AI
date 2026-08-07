@@ -93,7 +93,7 @@ export function ChatWindow({ contact, messages, onSend, typing = false, disabled
         <div className="bg-green-100 px-4 py-2 text-center text-xs text-green-800">
           <p>Consultation complete. The doctor will review your information shortly.</p>
           <a
-            href={`http://localhost:8000/api/v1/session/${sessionId}/summary`}
+            href={`/api/v1/session/${sessionId}/summary`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-1 inline-block underline font-medium text-green-900"
