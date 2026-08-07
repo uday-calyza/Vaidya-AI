@@ -17,13 +17,14 @@ class BedrockService:
         self.client = boto3.client("bedrock-runtime", **client_kwargs)
         self.model_id = settings.bedrock_model_id
 
-    def converse(self, messages: list[dict], system_prompt: str) -> dict:
+    def converse(self, messages: list[dict], system_prompt: str, max_tokens: int = 300) -> dict:
         """
         Call Bedrock Converse API.
 
         Args:
             messages: [{"role": "user"|"assistant", "content": [{"text": "..."}]}]
             system_prompt: The system instruction text.
+            max_tokens: Maximum tokens for response (300 for chat, 1024 for summaries).
 
         Returns:
             {"text": str, "tokens_in": int, "tokens_out": int}
@@ -33,7 +34,7 @@ class BedrockService:
             system=[{"text": system_prompt}],
             messages=messages,
             inferenceConfig={
-                "maxTokens": 300,
+                "maxTokens": max_tokens,
                 "temperature": 0.3,
             },
         )

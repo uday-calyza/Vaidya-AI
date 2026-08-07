@@ -27,7 +27,7 @@ class SummaryService:
         # Call Bedrock with summary prompt
         system_prompt = self.prompt.summary_prompt()
         messages = [{"role": "user", "content": [{"text": conversation_text}]}]
-        result = self.bedrock.converse(messages, system_prompt)
+        result = self.bedrock.converse(messages, system_prompt, max_tokens=1024)
 
         # Parse JSON response
         raw_text = result["text"]
