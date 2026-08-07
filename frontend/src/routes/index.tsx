@@ -94,6 +94,13 @@ function Index() {
       const data = await res.json();
       setTyping(false);
 
+      // Mark all patient messages as "read" (double blue tick) since AI has seen them
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.sender === "me" ? { ...m, status: "read" as const } : m
+        )
+      );
+
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
         text: data.reply,
@@ -127,7 +134,7 @@ function Index() {
                 Dr
               </div>
               <div>
-                <h1 className="text-sm font-semibold">Pre-Consult AI</h1>
+                <h1 className="text-sm font-semibold">Vaidya AI</h1>
                 <p className="text-[11px] opacity-80">Patient Registration</p>
               </div>
             </header>

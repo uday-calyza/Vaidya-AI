@@ -19,7 +19,7 @@ export const nowTime = () =>
 
 export const botContact: Contact = {
   id: "doctor",
-  name: "Pre-Consult AI",
+  name: "Vaidya AI",
   avatar: "Dr",
   lastSeen: "online",
   online: true,

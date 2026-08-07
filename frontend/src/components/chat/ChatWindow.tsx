@@ -25,23 +25,40 @@ type Props = {
 export function ChatWindow({ contact, messages, onSend, typing = false, disabled = false, chatStatus, sessionId }: Props) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
   useEffect(() => {
-    if (!disabled) inputRef.current?.focus();
+    if (!disabled) textareaRef.current?.focus();
   }, [disabled]);
 
-  const send = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 100) + "px";
+    }
+  }, [draft]);
+
+  const send = (e?: React.FormEvent) => {
+    e?.preventDefault();
     const text = draft.trim();
     if (!text || disabled) return;
     onSend(text);
     setDraft("");
-    inputRef.current?.focus();
+    textareaRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+    // Shift+Enter = new line (default textarea behavior, no action needed)
   };
 
   return (
@@ -109,20 +126,22 @@ export function ChatWindow({ contact, messages, onSend, typing = false, disabled
       )}
 
       {/* Input */}
-      <form onSubmit={send} className="flex items-center gap-2 px-2.5 py-2.5">
-        <div className="flex flex-1 items-center gap-2 rounded-full bg-card px-3 py-2 shadow-[var(--shadow-bubble)]">
-          <Smile className="size-5 shrink-0 text-muted-foreground" />
-          <input
-            ref={inputRef}
+      <form onSubmit={send} className="flex items-end gap-2 px-2.5 py-2.5">
+        <div className="flex flex-1 items-end gap-2 rounded-2xl bg-card px-3 py-2 shadow-[var(--shadow-bubble)]">
+          <Smile className="size-5 shrink-0 text-muted-foreground mb-0.5" />
+          <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={disabled ? "Chat ended" : "Message"}
             aria-label="Message"
             disabled={disabled}
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            rows={1}
+            className="min-w-0 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 max-h-[100px]"
           />
-          <Paperclip className="size-[18px] shrink-0 text-muted-foreground" />
-          <Camera className="size-[18px] shrink-0 text-muted-foreground" />
+          <Paperclip className="size-[18px] shrink-0 text-muted-foreground mb-0.5" />
+          <Camera className="size-[18px] shrink-0 text-muted-foreground mb-0.5" />
         </div>
         <button
           type="submit"
