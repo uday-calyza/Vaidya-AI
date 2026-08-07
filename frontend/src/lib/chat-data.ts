@@ -25,5 +25,5 @@ export const botContact: Contact = {
   online: true,
 };
 
-// API base URL — uses VITE_API_BASE env var in production, falls back to localhost for dev
+// API base URL — uses relative path in production (same CloudFront domain), falls back to localhost for dev
 export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api/v1";

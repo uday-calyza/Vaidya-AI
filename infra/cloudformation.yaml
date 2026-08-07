@@ -341,6 +341,11 @@ Resources:
             OriginAccessControlId: !Ref FrontendOAC
             S3OriginConfig:
               OriginAccessIdentity: ""
+          - Id: BackendOrigin
+            DomainName: !GetAtt EC2Instance.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 8000
+              OriginProtocolPolicy: http-only
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -348,6 +353,30 @@ Resources:
           CachedMethods: [GET, HEAD]
           ForwardedValues:
             QueryString: false
+        CacheBehaviors:
+          - PathPattern: "/api/*"
+            TargetOriginId: BackendOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Authorization
+                - Content-Type
+            DefaultTTL: 0
+            MinTTL: 0
+            MaxTTL: 0
+          - PathPattern: "/health"
+            TargetOriginId: BackendOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            ForwardedValues:
+              QueryString: false
+            DefaultTTL: 0
+            MinTTL: 0
+            MaxTTL: 0
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
