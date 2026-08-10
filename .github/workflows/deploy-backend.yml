@@ -83,6 +83,7 @@ jobs:
               -e APP_ENV=production \
               -e AWS_REGION=ap-south-1 \
               -e BEDROCK_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0 \
+              -e TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }} \
               -e CORS_ORIGINS="*" \
               863355752069.dkr.ecr.ap-south-1.amazonaws.com/vaidya-ai-backend:latest
 

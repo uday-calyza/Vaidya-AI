@@ -12,8 +12,28 @@ type SummaryData = {
   patient_name: string;
   session_id: string;
   specialty: string;
+  city: string;
+  state: string;
   status: string;
   summary: Record<string, unknown>;
+  health_context: {
+    city: string;
+    state: string;
+    date: string;
+    season: string;
+    local_alerts: Array<{
+      claim: string;
+      source: string;
+      url: string;
+      source_type: string;
+      verification_status: string;
+      relevance_score: number;
+      disease_keywords: string[];
+      region_match: string;
+      published_at: string | null;
+      retrieved_at: string;
+    }>;
+  } | null;
   conversation_turns: number;
   created_at: string;
   completed_at: string | null;
@@ -145,6 +165,39 @@ function SummaryPage() {
             {renderList("Red Flags", summary.red_flags, "red")}
             {renderList("Information Gaps", summary.information_gaps, "amber")}
           </>
+        )}
+
+        {/* Health Context Used (for doctor transparency) */}
+        {data.health_context && data.health_context.local_alerts && data.health_context.local_alerts.length > 0 && (
+          <div className="mb-4 rounded-xl bg-blue-50 p-5 shadow-sm">
+            <h3 className="mb-2 text-sm font-semibold text-blue-700 uppercase tracking-wide">
+              Health Context Used
+            </h3>
+            <p className="mb-2 text-xs text-blue-600">
+              Season: {data.health_context.season} | Location: {data.health_context.city}{data.health_context.state ? `, ${data.health_context.state}` : ""}
+            </p>
+            <ul className="space-y-2">
+              {data.health_context.local_alerts.map((alert, i) => (
+                <li key={i} className="text-sm text-gray-700">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-blue-400" />
+                    <div>
+                      <p>{alert.claim}</p>
+                      <p className="text-xs text-gray-500">
+                        Source: {alert.source} ({alert.source_type}) | {alert.published_at || "date unknown"}
+                        {alert.url && (
+                          <> | <a href={alert.url} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">link</a></>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-blue-500 italic">
+              Note: Above information from web search ({data.health_context.local_alerts[0]?.retrieved_at?.split("T")[0] || ""}). Not verified clinical data.
+            </p>
+          </div>
         )}
 
         {/* Footer */}

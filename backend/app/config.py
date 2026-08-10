@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     aws_region: str = "ap-south-1"
     bedrock_model_id: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
 
+    # Local Health Context Service (Tavily)
+    tavily_api_key: str = ""
+
     # App
     app_env: str = "development"
 

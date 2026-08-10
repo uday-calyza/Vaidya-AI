@@ -28,6 +28,7 @@ function Index() {
   const [patientName, setPatientName] = useState("");
   const [patientId, setPatientId] = useState("");
   const [specialty, setSpecialty] = useState("");
+  const [city, setCity] = useState("");
   const [formError, setFormError] = useState("");
 
   // Register patient and start session
@@ -47,6 +48,7 @@ function Index() {
           patient_id: patientId.trim(),
           patient_name: patientName.trim(),
           specialty: specialty,
+          city: city.trim(),
         }),
       });
       const data = await res.json();
@@ -179,6 +181,17 @@ function Index() {
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">City / Locality</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="e.g. Pune, Mumbai, Ahmedabad"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-green-500"
+                  />
                 </div>
 
                 {formError && (

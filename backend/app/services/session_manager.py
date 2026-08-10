@@ -19,7 +19,10 @@ class SessionManager:
         patient_id: str,
         patient_name: str,
         specialty: str,
+        city: str = "",
+        state: str = "",
         callback_url: str | None = None,
+        health_context=None,
     ) -> Session:
         """Create a new session for a patient."""
         session = Session(
@@ -28,7 +31,10 @@ class SessionManager:
             patient_id=patient_id,
             patient_name=patient_name,
             specialty=specialty,
+            city=city,
+            state=state,
             callback_url=callback_url,
+            health_context=health_context,
         )
         _sessions[session.session_id] = session
         return session

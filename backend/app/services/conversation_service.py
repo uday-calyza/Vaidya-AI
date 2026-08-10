@@ -14,12 +14,17 @@ class ConversationService:
 
     def get_first_message(self, session: Session) -> dict:
         """Generate the first AI message, addressing patient by name."""
-        system_prompt = self.prompt.intake_prompt(session.specialty)
+        # Build prompt with health context injected
+        system_prompt = self.prompt.intake_prompt(
+            specialty=session.specialty,
+            health_context=session.health_context,
+        )
 
         # Tell the LLM who the patient is and to greet them
         trigger = (
             f"Patient named {session.patient_name} has joined the chat. "
             f"They are visiting the {session.specialty} department. "
+            f"City: {session.city or 'not specified'}. "
             f"Greet them by name and ask your first question."
         )
         messages = [{"role": "user", "content": [{"text": trigger}]}]
@@ -53,8 +58,12 @@ class ConversationService:
         messages = list(session.messages)
         messages.append({"role": "user", "content": [{"text": user_message}]})
 
-        # Call Bedrock with specialty-specific prompt
-        system_prompt = self.prompt.intake_prompt(session.specialty)
+        # Build prompt with health context injected
+        system_prompt = self.prompt.intake_prompt(
+            specialty=session.specialty,
+            health_context=session.health_context,
+        )
+
         result = self.bedrock.converse(messages, system_prompt)
         reply_text = result["text"]
 
