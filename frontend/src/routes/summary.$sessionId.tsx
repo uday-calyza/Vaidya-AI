@@ -174,7 +174,7 @@ function SummaryPage() {
               Health Context Used
             </h3>
             <p className="mb-2 text-xs text-blue-600">
-              Season: {data.health_context.season} | Location: {data.health_context.city}{data.health_context.state ? `, ${data.health_context.state}` : ""}
+              Season: {capitalize(data.health_context.season)} | Location: {capitalize(data.health_context.city)}{data.health_context.state ? `, ${data.health_context.state}` : ""}
             </p>
             <ul className="space-y-2">
               {data.health_context.local_alerts.map((alert, i) => (
@@ -309,4 +309,9 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function capitalize(str: string): string {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
