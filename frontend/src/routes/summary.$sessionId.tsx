@@ -180,9 +180,18 @@ function SummaryPage() {
               {data.health_context.local_alerts.map((alert, i) => (
                 <li key={i} className="text-sm text-gray-700">
                   <div className="flex items-start gap-2">
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-blue-400" />
+                    <span className={`mt-1.5 size-2 shrink-0 rounded-full ${alert.region_match === "local" ? "bg-green-500" : alert.region_match === "regional" ? "bg-blue-400" : "bg-gray-400"}`} />
                     <div>
-                      <p>{alert.claim}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                          alert.region_match === "local" ? "bg-green-100 text-green-700" :
+                          alert.region_match === "regional" ? "bg-blue-100 text-blue-700" :
+                          "bg-gray-100 text-gray-600"
+                        }`}>
+                          {alert.region_match === "local" ? "Local" : alert.region_match === "regional" ? "Regional" : "General"}
+                        </span>
+                      </div>
+                      <p className="mt-0.5">{alert.claim}</p>
                       <p className="text-xs text-gray-500">
                         Source: {alert.source} ({alert.source_type}) | {alert.published_at || "date unknown"}
                         {alert.url && (

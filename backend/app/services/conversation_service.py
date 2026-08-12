@@ -64,6 +64,13 @@ class ConversationService:
             health_context=session.health_context,
         )
 
+        # Question counter: inject wrap-up instruction based on message count
+        assistant_count = sum(1 for m in messages if m["role"] == "assistant")
+        if assistant_count >= 7:
+            system_prompt += "\n\n[SYSTEM: You have sent 7+ messages. Your NEXT message MUST be your closing with Do's/Don'ts and COMPLETE. Do not ask any more questions. Wrap up NOW.]"
+        elif assistant_count >= 6:
+            system_prompt += "\n\n[SYSTEM: You have sent 6 messages. You have 1 message left before you MUST wrap up. Either ask your final question or close now.]"
+
         result = self.bedrock.converse(messages, system_prompt)
         reply_text = result["text"]
 

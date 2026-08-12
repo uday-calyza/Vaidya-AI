@@ -105,6 +105,19 @@ DISEASE_NAMES = [
     "dehydration", "food poisoning", "viral fever",
 ]
 
+# Keywords that indicate a result is a general guide/article (not an alert)
+GENERAL_INFO_KEYWORDS = [
+    "guide", "tips", "how to", "protect", "prevention", "precaution",
+    "stay safe", "health guide", "awareness", "what you need to know",
+    "things to do", "home remedies", "ayurvedic",
+]
+
+# Keywords that indicate a result is a specific outbreak/alert
+ALERT_KEYWORDS = [
+    "outbreak", "cases", "surge", "alert", "deaths", "fatal", "reported",
+    "confirmed", "rising", "spike", "emergency", "epidemic", "warning",
+]
+
 
 def detect_season(date: datetime | None = None) -> str:
     """Detect Indian season from the current month."""
@@ -124,6 +137,11 @@ def infer_state(city: str) -> str:
     return CITY_TO_STATE.get(city.lower().strip(), "")
 
 
+def is_known_city(city: str) -> bool:
+    """Check if city is in our known city-to-state map."""
+    return city.lower().strip() in CITY_TO_STATE
+
+
 def classify_source_type(url: str) -> str:
     """Classify source type based on URL domain. All remain 'reported' regardless."""
     url_lower = url.lower()
@@ -132,6 +150,49 @@ def classify_source_type(url: str) -> str:
     elif any(domain in url_lower for domain in ["ndtv", "timesofindia", "hindustantimes", "thehindu", "indianexpress", "livemint", "economictimes", "news18"]):
         return "news"
     return "unverified"
+
+
+def classify_claim_type(title: str, content: str) -> str:
+    """
+    Classify whether the result is a general health guide or a specific alert.
+    Returns: "reported_alert" | "general_info" | "news"
+    """
+    text_lower = f"{title} {content}".lower()
+
+    # Check for alert keywords first (higher priority)
+    alert_matches = sum(1 for kw in ALERT_KEYWORDS if kw in text_lower)
+    if alert_matches >= 2:
+        return "reported_alert"
+
+    # Check for general guide keywords
+    guide_matches = sum(1 for kw in GENERAL_INFO_KEYWORDS if kw in text_lower)
+    if guide_matches >= 1:
+        return "general_info"
+
+    return "news"
+
+
+def build_claim_text(title: str, content: str, claim_type: str, disease_keywords: list[str]) -> str:
+    """
+    Build a concise claim text based on the claim type.
+    - For alerts: keep the original title (it's usually specific)
+    - For general info: rewrite as "Seasonal reference: ..."
+    """
+    if claim_type == "reported_alert":
+        # Keep the original title — it's likely something like "Alert in Gujarat due to..."
+        return title.strip()
+
+    elif claim_type == "general_info":
+        # Rewrite to make it clear this is general seasonal info
+        if disease_keywords:
+            diseases = ", ".join(disease_keywords[:4])
+            return f"Seasonal health reference: {diseases} risks highlighted"
+        else:
+            return f"General seasonal health information"
+
+    else:
+        # News — keep title but it's generic
+        return title.strip()
 
 
 def extract_disease_keywords(text: str) -> list[str]:
@@ -152,17 +213,19 @@ def is_health_relevant(text: str) -> bool:
 
 
 def determine_region_match(result_text: str, city: str, state: str) -> str:
-    """Determine how closely the result matches the patient's location."""
+    """
+    Determine how closely the result matches the patient's location.
+    Returns: "local" | "regional" | "general"
+    """
     text_lower = result_text.lower()
     city_lower = city.lower().strip()
 
     if city_lower and city_lower in text_lower:
-        return "exact_city"
+        return "local"
     elif state and state.lower() in text_lower:
-        return "same_state"
-    elif any(s.lower() in text_lower for s in CITY_TO_STATE.values()):
-        return "nearby_state"
-    return "national"
+        return "regional"
+    else:
+        return "general"
 
 
 class HealthContextService:
@@ -227,13 +290,28 @@ class HealthContextService:
         """Perform Tavily searches and return structured health alerts."""
         month_name = now.strftime("%B")
         year = now.year
-        location = f"{city} {state}".strip()
 
-        # Two focused searches
-        queries = [
-            f"disease outbreak health alert {location} {month_name} {year}",
-            f"health advisory {state or city} {season} {year} India",
-        ]
+        # Build search queries based on city size
+        # For known major cities: search with city name
+        # For small/unknown towns: search at state level (better results)
+        if is_known_city(city):
+            # Major city — search specifically
+            queries = [
+                f"disease outbreak health alert {city} {state} {month_name} {year}",
+                f"health advisory {state} {season} {year} India",
+            ]
+        elif state:
+            # Small town but we know the state — search at state level
+            queries = [
+                f"disease outbreak health alert {state} {month_name} {year}",
+                f"health advisory {state} {season} {year} India",
+            ]
+        else:
+            # Unknown location — search at national level for the season
+            queries = [
+                f"disease outbreak India {month_name} {year}",
+                f"health advisory India {season} {year}",
+            ]
 
         all_results = []
         retrieved_at = now.isoformat()
@@ -244,7 +322,7 @@ class HealthContextService:
                     query=query,
                     search_depth="basic",
                     max_results=5,
-                    include_answer=False,  # Raw content only, no AI-generated summary
+                    include_answer=False,
                     include_raw_content=False,
                 )
                 results = response.get("results", [])
@@ -274,11 +352,13 @@ class HealthContextService:
             if score < 0.70:
                 continue
 
-            # Build claim from title (concise)
-            claim = title.strip()
-            if not claim:
-                # Use first sentence of content as claim
-                claim = content.split(".")[0].strip() if content else ""
+            # Extract disease keywords and classify
+            disease_keywords = extract_disease_keywords(full_text)
+            claim_type = classify_claim_type(title, content)
+            region_match = determine_region_match(full_text, city, state)
+
+            # Build better claim text based on type
+            claim = build_claim_text(title, content, claim_type, disease_keywords)
 
             if not claim or claim in seen_claims:
                 continue
@@ -292,25 +372,26 @@ class HealthContextService:
                 source_type=classify_source_type(url),
                 verification_status="reported",
                 relevance_score=round(score, 2),
-                disease_keywords=extract_disease_keywords(full_text),
-                region_match=determine_region_match(full_text, city, state),
+                disease_keywords=disease_keywords,
+                region_match=region_match,
                 published_at=published_date,
                 retrieved_at=retrieved_at,
             )
             alerts.append(alert)
 
-        # Sort by relevance score (highest first) and cap at 5
-        alerts.sort(key=lambda a: a.relevance_score, reverse=True)
+        # Sort: alerts first, then by relevance score
+        alerts.sort(key=lambda a: (
+            0 if classify_claim_type(a.claim, "") == "reported_alert" else 1,
+            -a.relevance_score,
+        ))
         return alerts[:5]
 
 
 def _extract_source_name(url: str) -> str:
     """Extract a readable source name from a URL."""
     try:
-        # Get domain without www
         domain = url.split("//")[-1].split("/")[0]
         domain = domain.replace("www.", "")
-        # Map known domains to readable names
         domain_names = {
             "timesofindia.indiatimes.com": "Times of India",
             "ndtv.com": "NDTV",
@@ -322,6 +403,7 @@ def _extract_source_name(url: str) -> str:
             "who.int": "WHO",
             "mohfw.gov.in": "Ministry of Health (India)",
             "economictimes.indiatimes.com": "Economic Times",
+            "globalriskatlas.com": "Global Risk Atlas",
         }
         return domain_names.get(domain, domain)
     except Exception:
