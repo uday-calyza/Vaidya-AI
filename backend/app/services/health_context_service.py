@@ -205,6 +205,20 @@ def extract_disease_keywords(text: str) -> list[str]:
     return list(set(found))
 
 
+# Domains to exclude (irrelevant or low-quality for health context)
+EXCLUDED_DOMAINS = [
+    "youtube.com", "youtu.be", "tiktok.com", "instagram.com",
+    "facebook.com", "twitter.com", "x.com", "reddit.com",
+    "pinterest.com", "quora.com",
+]
+
+
+def is_excluded_domain(url: str) -> bool:
+    """Check if URL is from an excluded domain."""
+    url_lower = url.lower()
+    return any(domain in url_lower for domain in EXCLUDED_DOMAINS)
+
+
 def is_health_relevant(text: str) -> bool:
     """Check if a search result is health-related."""
     text_lower = text.lower()
@@ -344,6 +358,10 @@ class HealthContextService:
             # Combine title and content for analysis
             full_text = f"{title} {content}"
 
+            # Filter: exclude social media / video platforms
+            if is_excluded_domain(url):
+                continue
+
             # Filter: must be health-relevant
             if not is_health_relevant(full_text):
                 continue
@@ -379,12 +397,12 @@ class HealthContextService:
             )
             alerts.append(alert)
 
-        # Sort: alerts first, then by relevance score
+        # Sort: alerts first, then by relevance score. Cap at 3 results max.
         alerts.sort(key=lambda a: (
             0 if classify_claim_type(a.claim, "") == "reported_alert" else 1,
             -a.relevance_score,
         ))
-        return alerts[:5]
+        return alerts[:3]
 
 
 def _extract_source_name(url: str) -> str:

@@ -111,7 +111,7 @@ function SummaryPage() {
         {/* Patient Info Card */}
         <div className="mb-4 rounded-xl bg-white p-5 shadow-sm">
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <InfoItem label="Patient" value={data.patient_name} />
+            <InfoItem label="Patient" value={capitalizeName(data.patient_name)} />
             <InfoItem label="Patient ID" value={data.patient_id} />
             <InfoItem label="Specialty" value={specialtyLabel} />
             <InfoItem label="Status" value={<StatusBadge status={data.status} />} />
@@ -323,4 +323,9 @@ function formatDate(iso: string): string {
 function capitalize(str: string): string {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function capitalizeName(name: string): string {
+  if (!name) return "";
+  return name.split(" ").map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
 }
