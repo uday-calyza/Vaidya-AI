@@ -29,10 +29,14 @@ Structured clinical summary generated for the doctor
 
 ## Screenshots
 
-![Registration Form](screenshots/registration.png)
-![Chat Interface](screenshots/chat.png)
-![Doctor Summary - Clinical Data](screenshots/summary/summary1.png)
-![Doctor Summary - Health Context](screenshots/summary/summary2.png)
+<p align="center">
+  <img src="screenshots/registration.png" alt="Registration Form" width="280" />
+  <img src="screenshots/chat.png" alt="Chat Interface" width="280" />
+</p>
+<p align="center">
+  <img src="screenshots/summary/summary1.png" alt="Doctor Summary - Clinical Data" width="400" />
+  <img src="screenshots/summary/summary2.png" alt="Doctor Summary - Health Context" width="400" />
+</p>
 
 ---
 
