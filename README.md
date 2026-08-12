@@ -31,7 +31,8 @@ Structured clinical summary generated for the doctor
 
 ![Registration Form](screenshots/registration.png)
 ![Chat Interface](screenshots/chat.png)
-![Doctor Summary](screenshots/summary.png)
+![Doctor Summary - Clinical Data](screenshots/summary/summary1.png)
+![Doctor Summary - Health Context](screenshots/summary/summary2.png)
 
 ---
 
