@@ -56,7 +56,7 @@ def register_patient(request: RegisterPatientRequest):
     city = request.city.strip()
     if city:
         try:
-            health_context = health_context_svc.gather_context(city=city)
+            health_context = health_context_svc.gather_context(city=city, specialty=specialty)
         except Exception:
             pass  # Context is an enhancement, not a dependency
 

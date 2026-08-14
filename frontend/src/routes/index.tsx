@@ -180,6 +180,8 @@ function Index() {
                     value={specialty}
                     onChange={(e) => setSpecialty(e.target.value)}
                     className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-green-500"
+                    size={1}
+                    style={{ maxHeight: "200px" }}
                   >
                     <option value="">Select specialist...</option>
                     {SPECIALTIES.map((s) => (

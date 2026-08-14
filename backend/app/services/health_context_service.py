@@ -242,6 +242,84 @@ def determine_region_match(result_text: str, city: str, state: str) -> str:
         return "general"
 
 
+# Specialties where regional disease/outbreak context is NOT relevant
+SKIP_CONTEXT_SPECIALTIES = [
+    "orthopedic",
+    "ophthalmology",
+    "general_surgery",
+]
+
+# Specialty-specific search query templates
+SPECIALTY_SEARCH_QUERIES: dict[str, list[str]] = {
+    "general_md": [
+        "disease outbreak health alert {location} {month} {year}",
+        "health advisory {state_or_city} {season} {year} India",
+    ],
+    "cardiology": [
+        "heart disease cardiovascular health alert {state_or_city} {year}",
+        "cardiac cases trends India {season} {year}",
+    ],
+    "neurology": [
+        "neurological disease cases {state_or_city} {year}",
+        "encephalitis brain infection {state_or_city} {season} {year}",
+    ],
+    "dermatology": [
+        "skin infection fungal disease {state_or_city} {season} {year}",
+        "dermatology skin problems {season} India {year}",
+    ],
+    "gastroenterology": [
+        "food poisoning gastro diarrhea outbreak {location} {month} {year}",
+        "waterborne disease {state_or_city} {season} {year} India",
+    ],
+    "ent": [
+        "respiratory viral infection ENT {state_or_city} {season} {year}",
+        "cold flu sore throat cases {state_or_city} {month} {year}",
+    ],
+    "gynecology": [
+        "women health maternal health {state_or_city} {year}",
+        "pregnancy health advisory India {season} {year}",
+    ],
+    "psychiatry": [
+        "mental health depression anxiety trends India {year}",
+        "mental health awareness {state_or_city} {year}",
+    ],
+    "pulmonology": [
+        "respiratory infection air pollution AQI {location} {month} {year}",
+        "lung disease asthma COPD {state_or_city} {season} {year}",
+    ],
+    "urology": [
+        "kidney urinary infection cases {state_or_city} {season} {year}",
+        "UTI kidney stone health {state_or_city} {year}",
+    ],
+}
+
+
+def _build_specialty_queries(
+    city: str, state: str, season: str, month: str, year: int, specialty: str
+) -> list[str]:
+    """Build search queries based on specialty and location."""
+    location = f"{city} {state}".strip() if is_known_city(city) else (state or city)
+    state_or_city = state or city
+
+    # Get specialty-specific query templates (fall back to general_md)
+    templates = SPECIALTY_SEARCH_QUERIES.get(specialty, SPECIALTY_SEARCH_QUERIES["general_md"])
+
+    queries = []
+    for template in templates:
+        query = template.format(
+            location=location,
+            city=city,
+            state=state,
+            state_or_city=state_or_city,
+            season=season,
+            month=month,
+            year=year,
+        )
+        queries.append(query)
+
+    return queries
+
+
 class HealthContextService:
     """
     Local Health Context Service.
@@ -256,13 +334,14 @@ class HealthContextService:
         if settings.tavily_api_key:
             self.client = TavilyClient(api_key=settings.tavily_api_key)
 
-    def gather_context(self, city: str, state: str = "") -> HealthContext:
+    def gather_context(self, city: str, state: str = "", specialty: str = "general_md") -> HealthContext:
         """
-        Gather local health context for a patient's location.
+        Gather local health context for a patient's location and specialty.
 
         Args:
             city: Patient's city (free text from registration)
             state: Patient's state (auto-inferred from city if not provided)
+            specialty: Patient's specialty (used to make search relevant)
 
         Returns:
             HealthContext with season, location, and any relevant health alerts.
@@ -288,9 +367,13 @@ class HealthContextService:
         if not self.client:
             return context
 
+        # Skip health context search for specialties where it's not relevant
+        if specialty in SKIP_CONTEXT_SPECIALTIES:
+            return context
+
         # Perform searches and gather alerts
         try:
-            alerts = self._search_health_context(city, state, season, now)
+            alerts = self._search_health_context(city, state, season, now, specialty)
             context.local_alerts = alerts
         except Exception:
             # Graceful degradation: if search fails, AI works without context
@@ -299,33 +382,14 @@ class HealthContextService:
         return context
 
     def _search_health_context(
-        self, city: str, state: str, season: str, now: datetime
+        self, city: str, state: str, season: str, now: datetime, specialty: str = "general_md"
     ) -> list[HealthAlert]:
         """Perform Tavily searches and return structured health alerts."""
         month_name = now.strftime("%B")
         year = now.year
 
-        # Build search queries based on city size
-        # For known major cities: search with city name
-        # For small/unknown towns: search at state level (better results)
-        if is_known_city(city):
-            # Major city — search specifically
-            queries = [
-                f"disease outbreak health alert {city} {state} {month_name} {year}",
-                f"health advisory {state} {season} {year} India",
-            ]
-        elif state:
-            # Small town but we know the state — search at state level
-            queries = [
-                f"disease outbreak health alert {state} {month_name} {year}",
-                f"health advisory {state} {season} {year} India",
-            ]
-        else:
-            # Unknown location — search at national level for the season
-            queries = [
-                f"disease outbreak India {month_name} {year}",
-                f"health advisory India {season} {year}",
-            ]
+        # Build specialty-aware search queries
+        queries = _build_specialty_queries(city, state, season, month_name, year, specialty)
 
         all_results = []
         retrieved_at = now.isoformat()
