@@ -247,6 +247,8 @@ SKIP_CONTEXT_SPECIALTIES = [
     "orthopedic",
     "ophthalmology",
     "general_surgery",
+    "psychiatry",
+    "urology",
 ]
 
 # Specialty-specific search query templates
