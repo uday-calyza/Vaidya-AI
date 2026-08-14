@@ -16,6 +16,11 @@ const SPECIALTIES = [
   { value: "orthopedic", label: "Orthopedic (Bones & Joints)" },
   { value: "ent", label: "ENT (Ear, Nose & Throat)" },
   { value: "gynecology", label: "Gynecologist (Women's Health)" },
+  { value: "psychiatry", label: "Psychiatrist (Mental Health)" },
+  { value: "pulmonology", label: "Pulmonologist (Lungs & Breathing)" },
+  { value: "urology", label: "Urologist (Kidney & Urinary)" },
+  { value: "general_surgery", label: "General Surgeon" },
+  { value: "ophthalmology", label: "Ophthalmologist (Eyes)" },
 ];
 
 function Index() {

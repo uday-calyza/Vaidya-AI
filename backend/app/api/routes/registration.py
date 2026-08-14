@@ -13,6 +13,8 @@ health_context_svc = HealthContextService()
 VALID_SPECIALTIES = [
     "general_md", "cardiology", "neurology", "dermatology",
     "gastroenterology", "orthopedic", "ent", "gynecology",
+    "psychiatry", "pulmonology", "urology", "general_surgery",
+    "ophthalmology",
 ]
 
 

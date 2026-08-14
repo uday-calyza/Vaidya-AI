@@ -300,6 +300,11 @@ function formatSpecialty(specialty: string): string {
     orthopedic: "Orthopedic",
     ent: "ENT (Ear, Nose & Throat)",
     gynecology: "Gynecologist",
+    psychiatry: "Psychiatrist",
+    pulmonology: "Pulmonologist",
+    urology: "Urologist",
+    general_surgery: "General Surgeon",
+    ophthalmology: "Ophthalmologist",
   };
   return map[specialty] || specialty;
 }
