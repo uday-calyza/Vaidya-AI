@@ -90,8 +90,8 @@ export function ChatWindow({ contact, messages, onSend, typing = false, disabled
           <MessageBubble key={message.id} message={message} />
         ))}
         {typing && (
-          <div className="flex justify-end px-3">
-            <div className="flex gap-1 rounded-2xl rounded-br-md bg-bubble-in px-3 py-2.5 shadow-[var(--shadow-bubble)]">
+          <div className="flex justify-start px-3">
+            <div className="flex gap-1 rounded-2xl rounded-bl-md bg-bubble-in px-3 py-2.5 shadow-[var(--shadow-bubble)]">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
