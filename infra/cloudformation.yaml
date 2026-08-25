@@ -335,6 +335,12 @@ Resources:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
+        Aliases:
+          - vaidyaai.calyzatech.com
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:863355752069:certificate/647e80db-f553-4403-883c-c76c2d57f625
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
