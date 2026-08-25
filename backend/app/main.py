@@ -71,6 +71,15 @@ def health_check():
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+@app.get("/static/{filename}")
+def serve_static(filename: str):
+    """Serve static files (favicon, etc.)."""
+    file_path = STATIC_DIR / filename
+    if file_path.exists():
+        return FileResponse(file_path)
+    return {"error": "not found"}
+
+
 @app.get("/admin")
 def admin_dashboard():
     """Serve the admin dashboard for initiating WhatsApp conversations."""
