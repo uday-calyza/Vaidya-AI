@@ -3,8 +3,10 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pathlib import Path
 
-from app.api.routes import registration, chat, sessions, hospital
+from app.api.routes import registration, chat, sessions, hospital, whatsapp
 from app.config import settings
 from app.services.session_manager import SessionManager
 from app.services.summary_service import SummaryService
@@ -57,8 +59,19 @@ app.include_router(registration.router, prefix="/api/v1", tags=["registration"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(hospital.router, prefix="/api/v1", tags=["hospital"])
+app.include_router(whatsapp.router, prefix="/api/v1", tags=["whatsapp"])
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "version": "0.2.0", "env": settings.app_env}
+
+
+# Serve admin dashboard
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/admin")
+def admin_dashboard():
+    """Serve the admin dashboard for initiating WhatsApp conversations."""
+    return FileResponse(STATIC_DIR / "admin.html")

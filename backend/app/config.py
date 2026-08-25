@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     # Local Health Context Service (Tavily)
     tavily_api_key: str = ""
 
+    # WhatsApp Business API (Meta Cloud API)
+    whatsapp_api_url: str = "https://graph.facebook.com/v21.0"
+    whatsapp_phone_number_id: str = ""
+    whatsapp_access_token: str = ""
+    whatsapp_verify_token: str = "vaidya_bot_verify_token"
+
     # App
     app_env: str = "development"
 

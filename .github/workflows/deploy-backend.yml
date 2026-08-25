@@ -84,6 +84,10 @@ jobs:
               -e AWS_REGION=ap-south-1 \
               -e BEDROCK_MODEL_ID=global.anthropic.claude-haiku-4-5-20251001-v1:0 \
               -e TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }} \
+              -e WHATSAPP_API_URL=https://graph.facebook.com/v25.0 \
+              -e WHATSAPP_PHONE_NUMBER_ID=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }} \
+              -e WHATSAPP_ACCESS_TOKEN=${{ secrets.WHATSAPP_ACCESS_TOKEN }} \
+              -e WHATSAPP_VERIFY_TOKEN=${{ secrets.WHATSAPP_VERIFY_TOKEN }} \
               -e CORS_ORIGINS="*" \
               863355752069.dkr.ecr.ap-south-1.amazonaws.com/vaidya-ai-backend:latest
 

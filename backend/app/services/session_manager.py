@@ -7,6 +7,9 @@ from app.config import settings
 # In-memory store — will be replaced by DB later
 _sessions: dict[str, Session] = {}
 
+# Phone number → session_id mapping (for WhatsApp lookup)
+_phone_to_session: dict[str, str] = {}
+
 SESSION_TIMEOUT_MINUTES = 30
 
 
@@ -23,6 +26,7 @@ class SessionManager:
         state: str = "",
         callback_url: str | None = None,
         health_context=None,
+        patient_phone: str = "",
     ) -> Session:
         """Create a new session for a patient."""
         session = Session(
@@ -31,13 +35,28 @@ class SessionManager:
             patient_id=patient_id,
             patient_name=patient_name,
             specialty=specialty,
+            patient_phone=patient_phone,
             city=city,
             state=state,
             callback_url=callback_url,
             health_context=health_context,
         )
         _sessions[session.session_id] = session
+
+        # Map phone → session for WhatsApp lookup
+        if patient_phone:
+            _phone_to_session[patient_phone] = session.session_id
+
         return session
+
+    def get_by_phone(self, phone: str) -> Session | None:
+        """Get active session by patient phone number (for WhatsApp webhook)."""
+        session_id = _phone_to_session.get(phone)
+        if session_id:
+            session = _sessions.get(session_id)
+            if session and session.status == "active":
+                return session
+        return None
 
     def get(self, session_id: str) -> Session | None:
         """Get a session by ID. Returns None if not found."""

@@ -62,6 +62,7 @@ class Session:
     patient_id: str
     patient_name: str
     specialty: str
+    patient_phone: str = ""  # WhatsApp number with country code (e.g., "919876543210")
     city: str = ""
     state: str = ""
     status: str = "active"  # active | completed | emergency | expired

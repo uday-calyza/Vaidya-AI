@@ -377,6 +377,16 @@ Resources:
             DefaultTTL: 0
             MinTTL: 0
             MaxTTL: 0
+          - PathPattern: "/admin"
+            TargetOriginId: BackendOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            ForwardedValues:
+              QueryString: false
+            DefaultTTL: 0
+            MinTTL: 0
+            MaxTTL: 0
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
