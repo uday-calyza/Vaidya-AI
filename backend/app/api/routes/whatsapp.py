@@ -62,13 +62,10 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     # Clean phone number (remove +, spaces, dashes)
     phone = request.patient_phone.replace("+", "").replace(" ", "").replace("-", "")
 
-    # Check if patient already has an active session
+    # Check if patient already has an active session — if so, expire it and start fresh
     existing = session_mgr.get_by_phone(phone)
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Patient already has an active session: {existing.session_id}",
-        )
+        session_mgr.mark_expired(existing.session_id)
 
     # Create session
     session = session_mgr.create(

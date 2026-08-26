@@ -87,6 +87,9 @@ class SessionManager:
         session = _sessions.get(session_id)
         if session:
             session.status = "expired"
+            # Remove phone mapping so a new session can be created
+            if session.patient_phone and _phone_to_session.get(session.patient_phone) == session_id:
+                del _phone_to_session[session.patient_phone]
 
     def list_by_hospital(self, hospital_id: str) -> list[Session]:
         """List all sessions for a hospital (today only)."""
