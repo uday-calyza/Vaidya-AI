@@ -82,8 +82,8 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     # Send template message to patient
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
-        template_name="vaidya_ai",
-        parameters=[request.patient_name],
+        template_name="hello_world",
+        parameters=[],
     )
 
     if result.get("error"):
