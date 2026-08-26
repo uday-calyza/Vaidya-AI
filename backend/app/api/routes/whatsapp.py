@@ -82,7 +82,7 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     # Send template message to patient
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
-        template_name="preconsultation_start",
+        template_name="vaidya_preconsult",
         parameters=[request.patient_name],
     )
 
