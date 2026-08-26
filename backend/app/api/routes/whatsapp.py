@@ -80,6 +80,7 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
         template_name="hello_world",
+        language_code="en_US",
         parameters=[],
     )
 
