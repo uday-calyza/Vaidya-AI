@@ -77,11 +77,12 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     )
 
     # Send template message to patient
+    print(f"[INITIATE] Creating session for phone: '{phone}', name: '{request.patient_name}'", flush=True)
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
-        template_name="hello_world",
-        language_code="en_US",
-        parameters=[],
+        template_name="vaidya_ai",
+        language_code="en",
+        parameters=[request.patient_name],
     )
 
     if result.get("error"):
@@ -146,16 +147,22 @@ async def receive_whatsapp_message(request: Request):
     phone = parsed["from_phone"]
     message_text = parsed["message_text"]
 
-    logger.info(f"WhatsApp message from {phone}: {message_text[:50]}...")
+    print(f"[WEBHOOK] Message from phone: '{phone}', text: '{message_text[:50]}'", flush=True)
 
     # Find the active session for this phone number
     session = session_mgr.get_by_phone(phone)
+    print(f"[WEBHOOK] Session lookup for '{phone}': {'FOUND' if session else 'NOT FOUND'}", flush=True)
+
     if not session:
+        # Debug: show all active sessions
+        from app.services.session_manager import _phone_to_session, _sessions
+        print(f"[WEBHOOK] Phone map: {dict(_phone_to_session)}", flush=True)
+        print(f"[WEBHOOK] Active sessions: {[(s.patient_phone, s.status) for s in _sessions.values()]}", flush=True)
+
         # No active session — patient messaged without being initiated
         whatsapp_svc.send_text_message(
             to_phone=phone,
-            message="Hello! I don't have an active consultation for you right now. "
-                    "Please contact your hospital reception to start a pre-consultation.",
+            message=f"[DEBUG] No session for phone '{phone}'. Active phones: {list(_phone_to_session.keys())}",
         )
         return {"status": "ok"}
 
@@ -169,10 +176,10 @@ async def receive_whatsapp_message(request: Request):
                 message=result["first_message"],
             )
         except Exception as e:
-            logger.error(f"Failed to generate first message for {phone}: {e}")
+            print(f"[WEBHOOK] ERROR get_first_message: {type(e).__name__}: {e}", flush=True)
             whatsapp_svc.send_text_message(
                 to_phone=phone,
-                message="Sorry, I'm having trouble right now. Please try again in a moment.",
+                message=f"[DEBUG] Error: {type(e).__name__}: {str(e)[:200]}",
             )
         return {"status": "ok"}
 
@@ -180,10 +187,10 @@ async def receive_whatsapp_message(request: Request):
     try:
         result = conversation_svc.chat(session, message_text)
     except Exception as e:
-        logger.error(f"Chat failed for {phone}: {e}")
+        print(f"[WEBHOOK] ERROR chat: {type(e).__name__}: {e}", flush=True)
         whatsapp_svc.send_text_message(
             to_phone=phone,
-            message="Sorry, something went wrong. Please try again.",
+            message=f"[DEBUG] Chat error: {type(e).__name__}: {str(e)[:200]}",
         )
         return {"status": "ok"}
 
@@ -198,8 +205,7 @@ async def receive_whatsapp_message(request: Request):
         try:
             summary_svc.generate(session)
             callback_svc.send(session)
-            logger.info(f"Session completed for {phone}. Summary generated.")
         except Exception as e:
-            logger.error(f"Summary/callback failed for {phone}: {e}")
+            print(f"[WEBHOOK] ERROR summary/callback: {type(e).__name__}: {e}", flush=True)
 
     return {"status": "ok"}
