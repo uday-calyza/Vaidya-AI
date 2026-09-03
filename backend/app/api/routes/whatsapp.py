@@ -80,9 +80,9 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     print(f"[INITIATE] Creating session for phone: '{phone}', name: '{request.patient_name}'", flush=True)
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
-        template_name="vaidya_ai",
+        template_name="hello_world",
         language_code="en_US",
-        parameters=[request.patient_name],
+        parameters=[],
     )
 
     if result.get("error"):
