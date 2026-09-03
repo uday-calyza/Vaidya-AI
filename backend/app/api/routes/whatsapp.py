@@ -81,7 +81,7 @@ def initiate_whatsapp_chat(request: InitiateRequest):
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
         template_name="vaidya_ai",
-        language_code="en",
+        language_code="en_US",
         parameters=[request.patient_name],
     )
 
