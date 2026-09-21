@@ -151,18 +151,35 @@ async def receive_whatsapp_message(request: Request):
 
     # Find the active session for this phone number
     session = session_mgr.get_by_phone(phone)
-    print(f"[WEBHOOK] Session lookup for '{phone}': {'FOUND' if session else 'NOT FOUND'}", flush=True)
+
+    # Also check for completed/expired sessions (patient messaging after session ended)
+    if not session:
+        from app.services.session_manager import _phone_to_session, _sessions
+        session_id = _phone_to_session.get(phone)
+        if session_id:
+            old_session = _sessions.get(session_id)
+            if old_session and old_session.status in ("completed", "emergency"):
+                # Session was completed — let patient know
+                whatsapp_svc.send_text_message(
+                    to_phone=phone,
+                    message="Your pre-consultation is complete. Your responses have been sent to the doctor. Thank you!",
+                )
+                return {"status": "ok"}
+            elif old_session and old_session.status == "expired":
+                # Session expired — let patient know
+                whatsapp_svc.send_text_message(
+                    to_phone=phone,
+                    message="Your previous session has expired. Please contact the hospital reception to start a new pre-consultation.",
+                )
+                return {"status": "ok"}
 
     if not session:
-        # Debug: show all active sessions
-        from app.services.session_manager import _phone_to_session, _sessions
-        print(f"[WEBHOOK] Phone map: {dict(_phone_to_session)}", flush=True)
-        print(f"[WEBHOOK] Active sessions: {[(s.patient_phone, s.status) for s in _sessions.values()]}", flush=True)
-
+        print(f"[WEBHOOK] No active session for '{phone}'", flush=True)
         # No active session — patient messaged without being initiated
         whatsapp_svc.send_text_message(
             to_phone=phone,
-            message=f"[DEBUG] No session for phone '{phone}'. Active phones: {list(_phone_to_session.keys())}",
+            message="Hello! I don't have an active consultation for you right now. "
+                    "Please contact your hospital reception to start a pre-consultation.",
         )
         return {"status": "ok"}
 
@@ -179,7 +196,7 @@ async def receive_whatsapp_message(request: Request):
             print(f"[WEBHOOK] ERROR get_first_message: {type(e).__name__}: {e}", flush=True)
             whatsapp_svc.send_text_message(
                 to_phone=phone,
-                message=f"[DEBUG] Error: {type(e).__name__}: {str(e)[:200]}",
+                message="Sorry, I'm having trouble right now. Please try again in a moment.",
             )
         return {"status": "ok"}
 
@@ -190,7 +207,7 @@ async def receive_whatsapp_message(request: Request):
         print(f"[WEBHOOK] ERROR chat: {type(e).__name__}: {e}", flush=True)
         whatsapp_svc.send_text_message(
             to_phone=phone,
-            message=f"[DEBUG] Chat error: {type(e).__name__}: {str(e)[:200]}",
+            message="Sorry, something went wrong. Please try again.",
         )
         return {"status": "ok"}
 
