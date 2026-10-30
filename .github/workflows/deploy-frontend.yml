@@ -1,6 +1,7 @@
 # =============================================================================
 # CI/CD: Build Frontend → Deploy to S3 → Invalidate CloudFront
 # =============================================================================
+<<<<<<< HEAD
 # Uses OIDC — no AWS access keys needed.
 #
 # Required GitHub Secrets:
@@ -9,6 +10,16 @@
 # Required GitHub Variables:
 #   S3_BUCKET                    - Frontend S3 bucket name (from CloudFormation output)
 #   CLOUDFRONT_DISTRIBUTION_ID   - CloudFront distribution ID (from CloudFormation output)
+=======
+# Triggers on push to main when frontend/ files change.
+#
+# Required GitHub Secrets:
+#   AWS_ACCESS_KEY_ID       - IAM user access key (with S3 + CloudFront permissions)
+#   AWS_SECRET_ACCESS_KEY   - IAM user secret key
+#   BACKEND_URL             - Elastic IP backend URL, e.g. "http://13.232.x.x:8000"
+#   S3_BUCKET               - Frontend S3 bucket name
+#   CLOUDFRONT_DISTRIBUTION_ID - CloudFront distribution ID
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
 # =============================================================================
 
 name: Deploy Frontend
@@ -19,7 +30,11 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/deploy-frontend.yml"
+<<<<<<< HEAD
   workflow_dispatch:
+=======
+  workflow_dispatch: # Allow manual trigger
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
 
 env:
   AWS_REGION: ap-south-1
@@ -29,10 +44,13 @@ jobs:
     name: Build & Deploy to S3
     runs-on: ubuntu-latest
 
+<<<<<<< HEAD
     permissions:
       id-token: write
       contents: read
 
+=======
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,26 +70,65 @@ jobs:
           VITE_API_BASE: "/api/v1"
         run: npm run build
 
+<<<<<<< HEAD
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_FRONTEND }}
+=======
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
         run: |
+<<<<<<< HEAD
           BUILD_DIR="frontend/dist"
           echo "Deploying from: $BUILD_DIR"
           aws s3 sync $BUILD_DIR s3://${{ vars.S3_BUCKET }} --delete
+=======
+          # Find the build output directory
+          if [ -d "frontend/dist" ]; then
+            BUILD_DIR="frontend/dist"
+          elif [ -d "frontend/.output/public" ]; then
+            BUILD_DIR="frontend/.output/public"
+          elif [ -d "frontend/dist/client" ]; then
+            BUILD_DIR="frontend/dist/client"
+          elif [ -d "frontend/build" ]; then
+            BUILD_DIR="frontend/build"
+          else
+            echo "ERROR: Could not find build output directory"
+            echo "Listing frontend directory:"
+            ls -la frontend/
+            exit 1
+          fi
+
+          echo "Deploying from: $BUILD_DIR"
+          aws s3 sync $BUILD_DIR s3://${{ secrets.S3_BUCKET }} --delete
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
+<<<<<<< HEAD
             --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+=======
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
             --paths "/*"
 
       - name: Deployment summary
         run: |
           echo "## Frontend Deployed!" >> $GITHUB_STEP_SUMMARY
+<<<<<<< HEAD
           echo "- S3 Bucket: \`${{ vars.S3_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- CloudFront invalidation triggered" >> $GITHUB_STEP_SUMMARY
+=======
+          echo "- S3 Bucket: \`${{ secrets.S3_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront invalidation triggered" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend URL: \`${{ secrets.BACKEND_URL }}\`" >> $GITHUB_STEP_SUMMARY
+>>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
