@@ -1,9 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-<<<<<<< HEAD
 Description: "Vaidya AI - Pre-Consult Medical Intake POC (EC2 + Elastic IP + S3/CloudFront + OIDC)"
-=======
-Description: "Vaidya AI - Pre-Consult Medical Intake POC (EC2 + Elastic IP + S3/CloudFront)"
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
 
 Parameters:
   AppName:
@@ -26,20 +22,11 @@ Parameters:
     Default: t3.micro
     Description: EC2 instance type (t3.micro = free tier eligible)
 
-<<<<<<< HEAD
-=======
-  KeyPairName:
-    Type: String
-    Description: Name of an existing EC2 Key Pair for SSH access
-    Default: ""
-
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   LatestAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
     Description: Latest Amazon Linux 2023 AMI
 
-<<<<<<< HEAD
   GitHubOrg:
     Type: String
     Default: uday-calyza
@@ -71,7 +58,7 @@ Resources:
         - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
 
   # =====================
-  # IAM Role — GitHub Actions (Deploy Infra / CloudFormation)
+  # IAM Role - GitHub Actions (Deploy Infra)
   # =====================
   GitHubActionsInfraRole:
     Type: AWS::IAM::Role
@@ -109,7 +96,7 @@ Resources:
                 Resource: "*"
 
   # =====================
-  # IAM Role — GitHub Actions (Deploy Backend)
+  # IAM Role - GitHub Actions (Deploy Backend)
   # =====================
   GitHubActionsBackendRole:
     Type: AWS::IAM::Role
@@ -151,7 +138,7 @@ Resources:
                 Resource: "*"
 
   # =====================
-  # IAM Role — GitHub Actions (Deploy Frontend)
+  # IAM Role - GitHub Actions (Deploy Frontend)
   # =====================
   GitHubActionsFrontendRole:
     Type: AWS::IAM::Role
@@ -188,9 +175,6 @@ Resources:
                   - cloudfront:GetDistribution
                 Resource: "*"
 
-=======
-Resources:
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   # =====================
   # VPC & Networking
   # =====================
@@ -251,20 +235,12 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # =====================
-<<<<<<< HEAD
-  # Security Group (No SSH — using SSM)
-=======
-  # Security Group
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
+  # Security Group (No SSH - using SSM)
   # =====================
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-<<<<<<< HEAD
-      GroupDescription: Allow HTTP (8000) only — SSH via SSM
-=======
-      GroupDescription: Allow HTTP (8000) and SSH access
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
+      GroupDescription: Allow HTTP 8000 only - SSH via SSM
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -272,14 +248,6 @@ Resources:
           ToPort: 8000
           CidrIp: 0.0.0.0/0
           Description: Backend API
-<<<<<<< HEAD
-=======
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-          Description: SSH access
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-ec2-sg"
@@ -298,11 +266,8 @@ Resources:
             Principal:
               Service: ec2.amazonaws.com
             Action: sts:AssumeRole
-<<<<<<< HEAD
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-=======
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
       Policies:
         - PolicyName: BedrockAccess
           PolicyDocument:
@@ -322,10 +287,7 @@ Resources:
                   - ecr:GetDownloadUrlForLayer
                   - ecr:BatchGetImage
                   - ecr:GetAuthorizationToken
-<<<<<<< HEAD
                   - ecr:BatchCheckLayerAvailability
-=======
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
                 Resource: "*"
 
   EC2InstanceProfile:
@@ -370,10 +332,6 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref LatestAmiId
-<<<<<<< HEAD
-=======
-      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
       IamInstanceProfile: !Ref EC2InstanceProfile
       SubnetId: !Ref PublicSubnet
       SecurityGroupIds:
@@ -385,36 +343,16 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -e
-
-          # Install Docker
           yum update -y
           yum install -y docker
           systemctl enable docker
           systemctl start docker
           usermod -aG docker ec2-user
-
-<<<<<<< HEAD
-          # Install SSM Agent (pre-installed on AL2023 but ensure it's running)
           systemctl enable amazon-ssm-agent
           systemctl start amazon-ssm-agent
-
-          # Login to ECR
           aws ecr get-login-password --region ${AWS::Region} | docker login --username AWS --password-stdin ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
-
-          # Pull and run the backend container (graceful if no image yet)
           IMAGE="${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}:latest"
-          docker pull $IMAGE || echo "No image yet — will be deployed via CI/CD"
-
-=======
-          # Login to ECR
-          aws ecr get-login-password --region ${AWS::Region} | docker login --username AWS --password-stdin ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
-
-          # Pull and run the backend container
-          IMAGE="${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}:latest"
-          docker pull $IMAGE || echo "No image yet — will be deployed via CI/CD"
-
-          # Run container (will fail gracefully if no image yet)
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
+          docker pull $IMAGE || echo "No image yet - will be deployed via CI/CD"
           docker run -d \
             --name vaidya-backend \
             --restart unless-stopped \
@@ -425,43 +363,8 @@ Resources:
             -e CORS_ORIGINS="*" \
             $IMAGE || echo "Container will start after first CI/CD deploy"
 
-<<<<<<< HEAD
   # =====================
   # Elastic IP
-=======
-          # Create a deploy helper script
-          cat > /home/ec2-user/deploy.sh << 'EOF'
-          #!/bin/bash
-          REGION="${AWS::Region}"
-          ACCOUNT="${AWS::AccountId}"
-          REPO="${ECRRepository}"
-          IMAGE="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO:latest"
-
-          echo "Pulling latest image..."
-          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$REGION.amazonaws.com
-          docker pull $IMAGE
-
-          echo "Restarting container..."
-          docker stop vaidya-backend 2>/dev/null || true
-          docker rm vaidya-backend 2>/dev/null || true
-          docker run -d \
-            --name vaidya-backend \
-            --restart unless-stopped \
-            -p 8000:8000 \
-            -e APP_ENV=production \
-            -e AWS_REGION=$REGION \
-            -e BEDROCK_MODEL_ID="${BedrockModelId}" \
-            -e CORS_ORIGINS="*" \
-            $IMAGE
-
-          echo "Done! Backend running at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8000"
-          EOF
-          chmod +x /home/ec2-user/deploy.sh
-          chown ec2-user:ec2-user /home/ec2-user/deploy.sh
-
-  # =====================
-  # Elastic IP (Stable public IP)
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   # =====================
   ElasticIP:
     Type: AWS::EC2::EIP
@@ -487,8 +390,7 @@ Resources:
       RetentionInDays: 7
 
   # =====================
-<<<<<<< HEAD
-  # ACM Certificate (auto-created, DNS validation via Namecheap)
+  # ACM Certificate (DNS validation via Namecheap)
   # =====================
   ACMCertificate:
     Type: AWS::CertificateManager::Certificate
@@ -503,8 +405,6 @@ Resources:
           Value: !Sub "${AppName}-cert"
 
   # =====================
-=======
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   # S3 Bucket for Frontend
   # =====================
   FrontendBucket:
@@ -536,11 +436,7 @@ Resources:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendCloudFront}"
 
   # =====================
-<<<<<<< HEAD
   # CloudFront OAC
-=======
-  # CloudFront for Frontend
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   # =====================
   FrontendOAC:
     Type: AWS::CloudFront::OriginAccessControl
@@ -551,31 +447,20 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
-<<<<<<< HEAD
   # =====================
   # CloudFront Distribution
   # =====================
   FrontendCloudFront:
     Type: AWS::CloudFront::Distribution
     DependsOn: ACMCertificate
-=======
-  FrontendCloudFront:
-    Type: AWS::CloudFront::Distribution
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
     Properties:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
         Aliases:
-<<<<<<< HEAD
           - !Ref DomainName
         ViewerCertificate:
           AcmCertificateArn: !Ref ACMCertificate
-=======
-          - vaidyaai.calyzatech.com
-        ViewerCertificate:
-          AcmCertificateArn: arn:aws:acm:us-east-1:863355752069:certificate/647e80db-f553-4403-883c-c76c2d57f625
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
         Origins:
@@ -649,72 +534,51 @@ Resources:
             ResponsePagePath: /index.html
         PriceClass: PriceClass_200
 
-<<<<<<< HEAD
 Outputs:
   BackendURL:
-    Description: Backend API URL (Elastic IP)
-=======
-Conditions:
-  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
-
-Outputs:
-  BackendURL:
-    Description: Backend API URL (Elastic IP - never changes)
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
+    Description: Backend API URL
     Value: !Sub "http://${ElasticIP}:8000"
 
   BackendIP:
-    Description: Backend Elastic IP address
+    Description: Backend Elastic IP
     Value: !Ref ElasticIP
 
   FrontendURL:
-    Description: Frontend URL (CloudFront)
+    Description: Frontend CloudFront URL
     Value: !Sub "https://${FrontendCloudFront.DomainName}"
 
-<<<<<<< HEAD
   CustomDomainURL:
     Description: Custom domain URL
     Value: !Sub "https://${DomainName}"
 
-=======
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
   ECRRepositoryUri:
-    Description: ECR Repository URI for Docker push
+    Description: ECR Repository URI
     Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}"
 
   FrontendBucketName:
-    Description: S3 bucket name for frontend deployment
+    Description: S3 bucket name
     Value: !Ref FrontendBucket
 
   CloudFrontDistributionId:
-    Description: CloudFront distribution ID (for cache invalidation)
+    Description: CloudFront distribution ID
     Value: !Ref FrontendCloudFront
 
   EC2InstanceId:
-<<<<<<< HEAD
-    Description: EC2 Instance ID (for SSM deploy)
+    Description: EC2 Instance ID for SSM deploy
     Value: !Ref EC2Instance
 
   BackendDeployRoleArn:
-    Description: IAM Role ARN for GitHub Actions backend deploy
+    Description: IAM Role ARN for backend deploy
     Value: !GetAtt GitHubActionsBackendRole.Arn
 
   FrontendDeployRoleArn:
-    Description: IAM Role ARN for GitHub Actions frontend deploy
+    Description: IAM Role ARN for frontend deploy
     Value: !GetAtt GitHubActionsFrontendRole.Arn
 
   InfraDeployRoleArn:
-    Description: IAM Role ARN for GitHub Actions infra deploy
+    Description: IAM Role ARN for infra deploy
     Value: !GetAtt GitHubActionsInfraRole.Arn
 
-  CertificateValidationNote:
-    Description: "IMPORTANT - Add the DNS CNAME record from ACM to Namecheap to validate the certificate"
-    Value: !Sub "Check ACM console in us-east-1 for CNAME record to add to ${DomainName}"
-=======
-    Description: EC2 Instance ID
-    Value: !Ref EC2Instance
-
-  SSHCommand:
-    Description: SSH command to access the server
-    Value: !Sub "ssh -i <your-key.pem> ec2-user@${ElasticIP}"
->>>>>>> 4c30a07de038dbf5df221cb87362595984d4c616
+  CertificateNote:
+    Description: Add DNS CNAME from ACM to Namecheap to validate certificate
+    Value: !Sub "Check ACM console in us-east-1 for CNAME record for ${DomainName}"
