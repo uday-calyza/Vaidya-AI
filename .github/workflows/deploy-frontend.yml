@@ -1,0 +1,77 @@
+# =============================================================================
+# CI/CD: Build Frontend → Deploy to S3 → Invalidate CloudFront
+# =============================================================================
+# Uses OIDC — no AWS access keys needed.
+#
+# Required GitHub Secrets:
+#   AWS_ROLE_ARN_FRONTEND        - IAM Role ARN for frontend deploy (from CloudFormation output)
+#
+# Required GitHub Variables:
+#   S3_BUCKET                    - Frontend S3 bucket name (from CloudFormation output)
+#   CLOUDFRONT_DISTRIBUTION_ID   - CloudFront distribution ID (from CloudFormation output)
+# =============================================================================
+
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to S3
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE: "/api/v1"
+        run: npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_FRONTEND }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: |
+          BUILD_DIR="frontend/dist"
+          echo "Deploying from: $BUILD_DIR"
+          aws s3 sync $BUILD_DIR s3://${{ vars.S3_BUCKET }} --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Deployment summary
+        run: |
+          echo "## Frontend Deployed!" >> $GITHUB_STEP_SUMMARY
+          echo "- S3 Bucket: \`${{ vars.S3_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront invalidation triggered" >> $GITHUB_STEP_SUMMARY

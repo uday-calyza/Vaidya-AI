@@ -1,0 +1,135 @@
+# =============================================================================
+# CI/CD: Deploy CloudFormation Infrastructure Stack
+# =============================================================================
+# Run this ONCE manually to create all AWS infrastructure.
+# After this runs, use deploy-backend.yml and deploy-frontend.yml for code deploys.
+#
+# Required GitHub Secrets (add these BEFORE running):
+#   AWS_ROLE_ARN_INFRA           - IAM Role ARN with CloudFormation + infra permissions
+#                                  Create this manually in AWS IAM once, then this
+#                                  workflow creates everything else automatically.
+#
+# After this runs, add these to GitHub from CloudFormation Outputs:
+#   Secrets:  AWS_ROLE_ARN_BACKEND, AWS_ROLE_ARN_FRONTEND
+#   Variables: EC2_INSTANCE_ID, S3_BUCKET, CLOUDFRONT_DISTRIBUTION_ID
+# =============================================================================
+
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy
+          - delete
+
+env:
+  AWS_REGION: ap-south-1
+  STACK_NAME: vaidya-ai-stack
+
+jobs:
+  deploy-infra:
+    name: Deploy CloudFormation Stack
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_INFRA }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation Stack
+        if: ${{ github.event.inputs.action == 'deploy' }}
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cloudformation.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+      - name: Get Stack Outputs
+        if: ${{ github.event.inputs.action == 'deploy' }}
+        run: |
+          echo "## CloudFormation Stack Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Add these to GitHub Secrets and Variables:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          EC2_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='EC2InstanceId'].OutputValue" \
+            --output text)
+
+          S3=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+
+          CF_ID=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+
+          BACKEND_ROLE=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='BackendDeployRoleArn'].OutputValue" \
+            --output text)
+
+          FRONTEND_ROLE=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendDeployRoleArn'].OutputValue" \
+            --output text)
+
+          BACKEND_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='BackendURL'].OutputValue" \
+            --output text)
+
+          FRONTEND_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue" \
+            --output text)
+
+          echo "### GitHub Secrets (sensitive)" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| AWS_ROLE_ARN_BACKEND | \`$BACKEND_ROLE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| AWS_ROLE_ARN_FRONTEND | \`$FRONTEND_ROLE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### GitHub Variables (non-sensitive)" >> $GITHUB_STEP_SUMMARY
+          echo "| Variable | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| EC2_INSTANCE_ID | \`$EC2_ID\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| S3_BUCKET | \`$S3\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CLOUDFRONT_DISTRIBUTION_ID | \`$CF_ID\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### URLs" >> $GITHUB_STEP_SUMMARY
+          echo "| | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|--|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | $BACKEND_URL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | $FRONTEND_URL |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ DNS Validation Required" >> $GITHUB_STEP_SUMMARY
+          echo "Go to ACM Console (us-east-1) → copy CNAME record → add to Namecheap DNS" >> $GITHUB_STEP_SUMMARY
+
+      - name: Delete CloudFormation Stack
+        if: ${{ github.event.inputs.action == 'delete' }}
+        run: |
+          aws cloudformation delete-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }}
+          echo "Stack deletion initiated. Check AWS Console for status."
