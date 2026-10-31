@@ -45,57 +45,6 @@ Parameters:
 Resources:
 
   # =====================
-  # OIDC Provider for GitHub Actions
-  # =====================
-  GitHubOIDCProvider:
-    Type: AWS::IAM::OIDCProvider
-    Properties:
-      Url: https://token.actions.githubusercontent.com
-      ClientIdList:
-        - sts.amazonaws.com
-      ThumbprintList:
-        - 6938fd4d98bab03faadb97b34396831e3780aea1
-        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
-
-  # =====================
-  # IAM Role - GitHub Actions (Deploy Infra)
-  # =====================
-  GitHubActionsInfraRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AppName}-infra-deploy-role"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !GetAtt GitHubOIDCProvider.Arn
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:*"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
-      Policies:
-        - PolicyName: InfraDeployPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - iam:*
-                  - ec2:*
-                  - ecr:*
-                  - s3:*
-                  - cloudfront:*
-                  - logs:*
-                  - ssm:*
-                  - acm:*
-                Resource: "*"
-
-  # =====================
   # IAM Role - GitHub Actions (Deploy Backend)
   # =====================
   GitHubActionsBackendRole:
@@ -107,7 +56,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !GetAtt GitHubOIDCProvider.Arn
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
@@ -149,7 +98,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !GetAtt GitHubOIDCProvider.Arn
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
@@ -390,21 +339,6 @@ Resources:
       RetentionInDays: 7
 
   # =====================
-  # ACM Certificate (DNS validation via Namecheap)
-  # =====================
-  ACMCertificate:
-    Type: AWS::CertificateManager::Certificate
-    Properties:
-      DomainName: !Ref DomainName
-      ValidationMethod: DNS
-      DomainValidationOptions:
-        - DomainName: !Ref DomainName
-          ValidationDomain: !Ref DomainName
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-cert"
-
-  # =====================
   # S3 Bucket for Frontend
   # =====================
   FrontendBucket:
@@ -452,17 +386,12 @@ Resources:
   # =====================
   FrontendCloudFront:
     Type: AWS::CloudFront::Distribution
-    DependsOn: ACMCertificate
     Properties:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
-        Aliases:
-          - !Ref DomainName
         ViewerCertificate:
-          AcmCertificateArn: !Ref ACMCertificate
-          SslSupportMethod: sni-only
-          MinimumProtocolVersion: TLSv1.2_2021
+          CloudFrontDefaultCertificate: true
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
@@ -547,10 +476,6 @@ Outputs:
     Description: Frontend CloudFront URL
     Value: !Sub "https://${FrontendCloudFront.DomainName}"
 
-  CustomDomainURL:
-    Description: Custom domain URL
-    Value: !Sub "https://${DomainName}"
-
   ECRRepositoryUri:
     Description: ECR Repository URI
     Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}"
@@ -577,8 +502,4 @@ Outputs:
 
   InfraDeployRoleArn:
     Description: IAM Role ARN for infra deploy
-    Value: !GetAtt GitHubActionsInfraRole.Arn
-
-  CertificateNote:
-    Description: Add DNS CNAME from ACM to Namecheap to validate certificate
-    Value: !Sub "Check ACM console in us-east-1 for CNAME record for ${DomainName}"
+    Value: !Sub "arn:aws:iam::${AWS::AccountId}:role/vaidya-ai-infra-deploy-role"
