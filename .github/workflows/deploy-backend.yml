@@ -79,7 +79,7 @@ jobs:
               \"docker pull $IMAGE\",
               \"docker stop vaidya-backend 2>/dev/null || true\",
               \"docker rm vaidya-backend 2>/dev/null || true\",
-              \"docker run -d --name vaidya-backend --restart unless-stopped -p 8000:8000 -e APP_ENV=production -e AWS_REGION=${{ env.AWS_REGION }} -e BEDROCK_MODEL_ID=${{ env.BEDROCK_MODEL_ID }} -e TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }} -e WHATSAPP_API_URL=https://graph.facebook.com/v25.0 -e WHATSAPP_PHONE_NUMBER_ID=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }} -e WHATSAPP_ACCESS_TOKEN=${{ secrets.WHATSAPP_ACCESS_TOKEN }} -e WHATSAPP_VERIFY_TOKEN=${{ secrets.WHATSAPP_VERIFY_TOKEN }} -e CORS_ORIGINS=* $IMAGE\",
+              \"docker run -d --name vaidya-backend --restart unless-stopped -p 8000:8000 -e APP_ENV=production -e AWS_REGION=${{ env.AWS_REGION }} -e BEDROCK_MODEL_ID=${{ env.BEDROCK_MODEL_ID }} -e DYNAMODB_TABLE_NAME=vaidya-ai-sessions -e TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }} -e WHATSAPP_API_URL=https://graph.facebook.com/v25.0 -e WHATSAPP_PHONE_NUMBER_ID=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }} -e WHATSAPP_ACCESS_TOKEN=${{ secrets.WHATSAPP_ACCESS_TOKEN }} -e WHATSAPP_VERIFY_TOKEN=${{ secrets.WHATSAPP_VERIFY_TOKEN }} -e CORS_ORIGINS=* $IMAGE\",
               \"sleep 5\",
               \"curl -f http://localhost:8000/health || echo Health check failed\",
               \"docker image prune -f\"

@@ -39,3 +39,7 @@ package-lock.json
 .tanstack/
 AGENTS.md
 *.log
+
+# FTR Documentation & IaC
+ftr/
+FTR/
