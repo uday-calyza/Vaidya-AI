@@ -126,6 +126,28 @@ class WhatsAppService:
             logger.error(f"Failed to parse WhatsApp webhook payload: {e}")
             return None
 
+    def parse_status_updates(self, payload: dict) -> list[dict]:
+        """
+        Parse message delivery status updates from Meta (sent, delivered, read, failed).
+        Returns a list of status objects with error details if delivery failed.
+        """
+        statuses = []
+        try:
+            for entry in payload.get("entry", []):
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    for s in value.get("statuses", []):
+                        statuses.append({
+                            "status": s.get("status"),
+                            "recipient_id": s.get("recipient_id"),
+                            "message_id": s.get("id"),
+                            "timestamp": s.get("timestamp"),
+                            "errors": s.get("errors", []),
+                        })
+        except Exception as e:
+            logger.error(f"Failed to parse WhatsApp status update: {e}")
+        return statuses
+
     def verify_webhook(self, mode: str, token: str, challenge: str) -> str | None:
         """
         Verify webhook during Meta setup.

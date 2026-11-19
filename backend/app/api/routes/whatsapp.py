@@ -37,6 +37,8 @@ class InitiateRequest(BaseModel):
     patient_name: str = Field(..., min_length=1, max_length=200, description="Patient name")
     specialty: str = Field(..., description="Doctor specialty")
     hospital_id: str = Field(default="default_hospital", description="Hospital identifier")
+    template_name: str | None = Field(default=None, description="Optional template name (e.g. 'hello_world' or 'vaidya_ai')")
+    language_code: str | None = Field(default=None, description="Optional language code (e.g. 'en_US' or 'en')")
 
 
 class InitiateResponse(BaseModel):
@@ -76,13 +78,19 @@ def initiate_whatsapp_chat(request: InitiateRequest):
         patient_phone=phone,
     )
 
+    # Template selection: use request override if provided, else settings or default
+    from app.config import settings
+    template_name = request.template_name or getattr(settings, "whatsapp_template_name", "vaidya_ai")
+    language_code = request.language_code or getattr(settings, "whatsapp_template_lang", "en")
+    parameters = [request.patient_name] if template_name != "hello_world" else None
+
     # Send template message to patient
-    print(f"[INITIATE] Creating session for phone: '{phone}', name: '{request.patient_name}'", flush=True)
+    print(f"[INITIATE] Creating session for phone: '{phone}', name: '{request.patient_name}', template: '{template_name}' ({language_code})", flush=True)
     result = whatsapp_svc.send_template_message(
         to_phone=phone,
-        template_name="vaidya_ai",
-        language_code="en",
-        parameters=[request.patient_name],
+        template_name=template_name,
+        language_code=language_code,
+        parameters=parameters,
     )
 
     if result.get("error"):
@@ -138,10 +146,21 @@ async def receive_whatsapp_message(request: Request):
     except Exception:
         return {"status": "ok"}
 
+    # Log delivery status updates (sent, delivered, read, failed)
+    statuses = whatsapp_svc.parse_status_updates(payload)
+    if statuses:
+        for s in statuses:
+            if s.get("status") == "failed":
+                errors = s.get("errors", [])
+                print(f"[WEBHOOK DELIVERY ERROR] Failed for recipient '{s.get('recipient_id')}': {errors}", flush=True)
+                logger.error(f"WhatsApp delivery failed for {s.get('recipient_id')}: {errors}")
+            else:
+                print(f"[WEBHOOK DELIVERY STATUS] Status '{s.get('status')}' for recipient '{s.get('recipient_id')}' (message id: {s.get('message_id')})", flush=True)
+
     # Parse the incoming message
     parsed = whatsapp_svc.parse_incoming_message(payload)
     if not parsed:
-        # Not a text message or status update — ignore silently
+        # Not a text message — status updates already handled
         return {"status": "ok"}
 
     phone = parsed["from_phone"]

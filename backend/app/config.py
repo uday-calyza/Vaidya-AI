@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     # WhatsApp Business API (Meta Cloud API)
     whatsapp_api_url: str = "https://graph.facebook.com/v21.0"
     whatsapp_phone_number_id: str = ""
+    whatsapp_waba_id: str = ""
     whatsapp_access_token: str = ""
     whatsapp_verify_token: str = "vaidya_bot_verify_token"
+    whatsapp_template_name: str = "vaidya_ai"
+    whatsapp_template_lang: str = "en"
 
     # App
     app_env: str = "development"
